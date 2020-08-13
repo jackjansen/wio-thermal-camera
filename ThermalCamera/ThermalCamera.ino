@@ -19,6 +19,8 @@ TFT_eSprite Display = TFT_eSprite(&tft);  // Create Sprite object "img" with poi
 // the pointer is used by pushSprite() to push it onto the TFT
 
 bool doRecalc;
+float minVal;
+float maxVal;
 
 unsigned long CurTime;
 
@@ -72,7 +74,9 @@ void recalcRange() {
 void keyCenter() {
   ShowGrid = ShowGrid *-1;
   Display.fillRect(15, 15, 210, 210, TFT_BLACK);
-  yield();
+  MidTemp = (minVal + maxVal) / 2;
+  TempRange = (maxVal - minVal) + 4;
+  doRecalc = true;
 }
 
 void keyLeft() {
@@ -89,13 +93,13 @@ void keyRight() {
 
 void keyUp() {
   Serial.println("key up");
-  MidTemp = MidTemp + TempRange / 3;
+  MidTemp = MidTemp + 1 + TempRange/10;
   doRecalc = true;
 }
 
 void keyDown() {
   Serial.println("key down");
-  MidTemp = MidTemp - TempRange / 3;
+  MidTemp = MidTemp - 1 - TempRange/10;
   doRecalc = true;
 }
 
@@ -185,6 +189,7 @@ void loop() {
 
   // read the sensor
   ThermalSensor.read_pixel_temperature(pixels);
+  minVal = maxVal = pixels[0];
   
   // now that we have an 8 x 8 sensor array
   // interpolate to get a bigger screen
@@ -203,6 +208,8 @@ void loop() {
       incr = col % 10;
       // find the interpolated value
       val = (intPoint * incr ) +  pixels[aLow];
+      if (val < minVal) minVal = val;
+      if (val > maxVal) maxVal = val;
       // store in the 70 x 70 array
       // since display is pointing away, reverse row to transpose row data
       //HDTemp[ (7 - row) * 10][col] = val;
