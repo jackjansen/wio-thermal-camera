@@ -18,12 +18,16 @@ TFT_eSPI    tft = TFT_eSPI();
 TFT_eSprite Display = TFT_eSprite(&tft);  // Create Sprite object "img" with pointer to "tft" object
 // the pointer is used by pushSprite() to push it onto the TFT
 
+bool doRecalc;
+
 unsigned long CurTime;
 
 uint16_t TheColor;
 // start with some initial colors
-uint16_t MinTemp = 25;
-uint16_t MaxTemp = 35;
+int16_t MidTemp = 30;
+uint16_t TempRange = 10;
+int16_t MinTemp = 25;
+int16_t MaxTemp = 35;
 
 // variables for interpolated colors
 byte red, green, blue;
@@ -52,11 +56,47 @@ float HDTemp[80][80];
 // create the camara object
 AMG8833 ThermalSensor;
 
+void recalcRange() {
+  if (TempRange < 4) TempRange = 4;
+  MinTemp = MidTemp - TempRange / 2;
+  MaxTemp = MidTemp + TempRange / 2;
+  Serial.print("min ");
+  Serial.print(MinTemp);
+  Serial.print(" max ");
+  Serial.println(MaxTemp);
+  setupDisplay();
+  doRecalc = false;
+}
+
 //Toggle the grid on and off
-void toggleGrid() {
+void keyCenter() {
   ShowGrid = ShowGrid *-1;
   Display.fillRect(15, 15, 210, 210, TFT_BLACK);
   yield();
+}
+
+void keyLeft() {
+  Serial.println("key left");
+  TempRange = TempRange / 2;
+  doRecalc = true;
+}
+
+void keyRight() {
+  Serial.println("key right");
+  TempRange = TempRange * 2;
+  doRecalc = true;
+}
+
+void keyUp() {
+  Serial.println("key up");
+  MidTemp = MidTemp + TempRange / 3;
+  doRecalc = true;
+}
+
+void keyDown() {
+  Serial.println("key down");
+  MidTemp = MidTemp - TempRange / 3;
+  doRecalc = true;
 }
 
 void setup() {
@@ -68,7 +108,15 @@ void setup() {
 
   //Interrupt to toggle Gird on and off
   pinMode(WIO_5S_PRESS, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(WIO_5S_PRESS), toggleGrid, FALLING);
+  pinMode(WIO_5S_LEFT, INPUT_PULLUP);
+  pinMode(WIO_5S_RIGHT, INPUT_PULLUP);
+  pinMode(WIO_5S_UP, INPUT_PULLUP);
+  pinMode(WIO_5S_DOWN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(WIO_5S_PRESS), keyCenter, FALLING);
+  attachInterrupt(digitalPinToInterrupt(WIO_5S_LEFT), keyLeft, FALLING);
+  attachInterrupt(digitalPinToInterrupt(WIO_5S_RIGHT), keyRight, FALLING);
+  attachInterrupt(digitalPinToInterrupt(WIO_5S_UP), keyUp, FALLING);
+  attachInterrupt(digitalPinToInterrupt(WIO_5S_DOWN), keyDown, FALLING);
 
   // set display rotation (you may need to change to 0 depending on your display
   tft.setRotation(3);
@@ -108,10 +156,13 @@ void setup() {
     tft.print("Readings: OK");
     delay(2000);
   }
+  Display.createSprite(TFT_HEIGHT, TFT_WIDTH);
+  setupDisplay();
+}
 
+void setupDisplay() {
   tft.fillScreen(TFT_BLACK);
   
-  Display.createSprite(TFT_HEIGHT, TFT_WIDTH);
   Display.fillSprite(TFT_BLACK); 
 
   // get the cutoff points for the color interpolation routines
@@ -123,7 +174,10 @@ void setup() {
 
 }
 
-void loop() {  
+void loop() {
+  if (doRecalc) {
+    recalcRange();
+  }
   CurTime = millis();
 
   // draw a large white border for the temperature area
@@ -313,13 +367,13 @@ void DrawLegend() {
   tft.setTextSize(2);
   tft.setCursor(245, 20);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  sprintf(buf, "%2d/%2d", MaxTemp, (int) (MaxTemp * 1.8) + 32);
+  sprintf(buf, "%4d", MaxTemp);
   tft.print(buf);
 
   tft.setTextSize(2);
   tft.setCursor(245, 210);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  sprintf(buf, "%2d/%2d", MinTemp, (int) (MinTemp * 1.8) + 32);
+  sprintf(buf, "%4d", MinTemp);
   tft.print(buf);
 
 }
